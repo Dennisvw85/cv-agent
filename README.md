@@ -64,6 +64,11 @@ Het script schrijft de beelden naar de website-repo en vult de sectie tussen `<!
 | `evals/` | Testvragen en het evaluatiescript |
 | `scripts/revoke-browser-access.sh` | Noodrem: trekt de rollen van de browser-identiteit (avatar-token) in |
 | `scripts/generate_visuals.py`, `visuals/` | Projectbeelden: FLUX → Content Safety → Phi-4-multimodal → Translator |
+| `api-v2/app.py` | v2-API: `/api/match` (vacature-check), en `/api/chat` met bronnen + vervolgvragen |
+| `scripts/publish_trust.py` | Evaluatie + red-team-resultaten → `website/src/trust.json` |
+| `evals/red_team.py` | AI Red Teaming Agent-scan tegen `/api/chat` |
+| `scripts/generate_timeline.py` | Loopbaan-tijdlijn met Code Interpreter → `website/src/img/timeline.png` |
+| `scripts/translate_site.py` | Engelse versie van de site (`en.html`) via Azure Translator |
 
 ## De keuzes
 
@@ -115,6 +120,16 @@ De evaluators draaien op de algemene deployment van de landing zone, niet op `cv
 
 ⚠ Agent-evaluatie in Foundry is public preview: geen SLA.
 
+## v2: vertrouwen, bronnen, vervolgvragen, loopbaan-tijdlijn
+
+Draait naast de productie-API, op de v2-omgeving van de site (branch `v2` in de website-repo, eigen Container App `api-v2`, zie `azure.yaml`).
+
+- **Sectie Vertrouwen.** `scripts/publish_trust.py` zet de evaluatie (`evals/results/latest.json`) en de AI Red Teaming Agent-scan (`evals/results/red_team.json`) om naar `website/src/trust.json`; `trust.js` op de site toont ze als twee kaarten (testvragen geslaagd, Attack Success Rate per techniek). Alleen samenvattingen, nooit de aanvalsvragen of -antwoorden zelf.
+- **AI Red Teaming Agent.** `evals/red_team.py` scant met vier risicocategorieën (violence, hate/unfairness, sexual, self-harm) en drie technieken (base64, flip, jailbreak) tegen dezelfde `/api/chat`-route als de site. ⚠ Preview, geen SLA.
+- **Bronnen bij een antwoord.** `/api/chat` in `api-v2/app.py` leest `file_citation`-annotaties uit de Responses API-output en stuurt leesbare labels terug (`sources`); de chat toont ze als klein label onder het antwoord, net als bij de vacature-check.
+- **Klikbare vervolgvragen.** Na elk antwoord doet `/api/chat` een tweede, lichte aanroep op dezelfde `cv-chat`-deployment (structured output, `max_output_tokens=120`, timeout 8s) voor twee korte vervolgvragen. Nooit blokkerend: lukt het niet (429, timeout, iets anders), dan komt er gewoon geen chip. Klikken vult het inputveld en verstuurt meteen.
+- **Loopbaan in één beeld.** `scripts/generate_timeline.py` is een build-time script: het rekent de perioden uit `knowledge/cv.md` zelf om naar getallen (jaar + maandfractie) en geeft het model bijna-kant-en-klare matplotlib-code om via de **Code Interpreter**-tool exact uit te voeren. Het PNG-bestand komt uit de ephemeral container (`container_file_citation`-annotatie) en gaat naar `website/src/img/timeline.png`; de alt-tekst wordt deterministisch opgebouwd uit dezelfde data (geen extra modelaanroep). Geen nieuwe agent of deployment: alles via `cv-chat`.
+
 ## Valkuilen
 
 1. **Task adherence zonder system message keurt terechte weigeringen af.** "Ik beantwoord alleen vragen over Dennis" is voor de evaluator een fout als hij de instructies niet kent. Geef de system message mee in `query` als gesprek.
@@ -130,3 +145,7 @@ De evaluators draaien op de algemene deployment van de landing zone, niet op `cv
 11. **Van Function App naar Container App wisselen gaf "expecting only 1 resource tagged azd-service-name: api".** Bicep verwijdert niets wat uit het template verdwijnt (incremental mode); de oude Function had dezelfde tag nog. Oude resources, hun rollen en hun identiteit expliciet opgeruimd.
 12. **Phi-4-multimodal schreef onbruikbare Nederlandse alt-teksten** (met een stuk Punjabi midden in de zin), en haalde bij capaciteit 1 al snel een rate limit. In het Engels was hij prima. Oplossing: Engels laten beschrijven en vertalen met Azure Translator. Klein model voor wat het goed kan, gespecialiseerde dienst voor de rest.
 13. **Een managed-identity-token is 24 uur geldig, niet 1 uur.** Gemeten bij het avatar-token. Dat veranderde de risicoafweging; de noodrem (rollen intrekken, ~5 min) is het antwoord.
+14. **De RedTeam-SDK schrijft zijn eigen werkmap, niet het bestand dat je in `output_path` meegeeft.** `red_team.scan(output_path=...)` maakte een map met `results.json`/`evaluation_results.json` (geen scorecard) op die plek, terwijl de echte scorecard + `attack_details` in een losse `.scan_<naam>_<tijdstempel>/final_results.json` naast het script terechtkwam. `evals/red_team.py` negeert `output_path` nu en kopieert zelf `final_results.json` naar `evals/results/red_team.json`, en ruimt de scanmap op.
+15. **Een `os.environ[...]`-KeyError in een try/except met een brede `except Exception` faalt stil.** De vervolgvragen-aanroep in `api-v2/app.py` gebruikte `AZURE_AI_MODEL_DEPLOYMENT_NAME`, dat wél in `.azure/dev/.env` staat maar niet als Container App-env var was gezet (`infra/main.bicep` had de param wel, maar hij was nooit in de `env`-array van de container gezet). Chips bleven leeg zonder foutmelding op de site; pas in de container-logs zichtbaar (`"Geen vervolgvragen gegenereerd (overgeslagen)"` direct na de hoofdaanroep, te snel voor een echte tweede HTTP-call).
+16. **Code Interpreter met vrije instructies ("teken een tijdlijn") levert soms geen tool-aanroep op, maar alleen tekst met een neppe `sandbox:`-downloadlink.** Oplossing: `tool_choice="required"`. Met twee container-file-citaties per gegenereerd bestand (één interne placeholder met `filename` als `cfile_....png` en start/end-index 0, één met de echte bestandsnaam) moet je de placeholder herkennen en overslaan.
+17. **Vrije opmaakinstructies aan Code Interpreter ("ronde hoeken") leverden een grafiek met vervormde, golvende vormen op**, vermoedelijk een mislukte poging tot `FancyBboxPatch`/Bezier-curves. Oplossing: reken de plot-data zelf uit in Python en geef het model bijna-kant-en-klare matplotlib-code (platte `ax.barh`, geen rounded corners) om via Code Interpreter uit te voeren, in plaats van het zelf te laten verzinnen.
