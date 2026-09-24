@@ -76,7 +76,8 @@ def numeric_rows(rows: list[dict], today: datetime.date) -> list[dict]:
     return out
 
 
-COLORS = ["#8fb3a3", "#c99b8f", "#9aa6c9", "#c9b98f", "#a893c2"]
+COLORS = ["#6f9587", "#a97f74", "#7c86a8", "#a99a74", "#8a769f"]  # gedempt, leesbaar op licht én donker
+TEXT_COLOR = "#8a8f98"  # middengrijs: leesbaar op zowel de donkere (#0b0c0f) als lichte (#f6f5f1) achtergrond
 
 
 def render_prompt(rows: list[dict]) -> str:
@@ -101,15 +102,16 @@ def render_prompt(rows: list[dict]) -> str:
         "for r in rows:\n"
         "    ax.barh(r['y'], r['end'] - r['start'], left=r['start'], height=0.5, color=r['color'], "
         "edgecolor='none', zorder=2)\n"
-        "    ax.text(r['start'], r['y'] + 0.32, r['title'], fontsize=9, fontweight='bold', va='bottom', "
-        "ha='left', color='#333333')\n"
-        "    ax.text(r['start'], r['y'] - 0.32, r['sub'], fontsize=8, va='top', ha='left', color='#666666')\n\n"
+        f"    ax.text(r['start'], r['y'] + 0.32, r['title'], fontsize=9, fontweight='bold', va='bottom', "
+        f"ha='left', color='{TEXT_COLOR}')\n"
+        f"    ax.text(r['start'], r['y'] - 0.32, r['sub'], fontsize=8, va='top', ha='left', color='{TEXT_COLOR}')\n\n"
         "ax.set_yticks([])\n"
         "for spine in ('left', 'top', 'right'):\n"
         "    ax.spines[spine].set_visible(False)\n"
-        "ax.set_xlabel('Jaar', fontsize=9, color='#666666')\n"
-        "ax.tick_params(axis='x', labelsize=8, colors='#666666')\n"
-        "ax.set_title('Loopbaan in beeld', fontsize=11, loc='left', color='#333333')\n"
+        f"ax.spines['bottom'].set_color('{TEXT_COLOR}')\n"
+        f"ax.set_xlabel('Jaar', fontsize=9, color='{TEXT_COLOR}')\n"
+        f"ax.tick_params(axis='x', labelsize=8, colors='{TEXT_COLOR}')\n"
+        f"ax.set_title('Loopbaan in beeld', fontsize=11, loc='left', color='{TEXT_COLOR}')\n"
         f"ax.set_xlim({min(r['start'] for r in rows) - 0.4}, {max(r['end'] for r in rows) + 0.4})\n"
         f"ax.set_ylim(-0.6, {len(rows) - 1 + 0.6})\n"
         "plt.tight_layout()\n"
