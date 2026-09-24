@@ -143,6 +143,18 @@ De evaluators draaien op de algemene deployment van de landing zone, niet op `cv
 
 ⚠ Agent-evaluatie in Foundry is public preview: geen SLA.
 
+## Evaluatie in CI
+
+De evaluatie draait ook los van mijn laptop, in GitHub Actions: `.github/workflows/evaluate.yml`, alleen handmatig te starten (**Run workflow**, met een keuze tussen `cv-agent` en `cv-agent-v2`).
+
+- **Keyless via OIDC.** Geen secret in de repo of in GitHub. Een user-assigned managed identity (`id-gh-cv-agent`, `infra/bootstrap/cicd.bicep`) met een federated credential voor GitHub-environment `eval` ruilt het OIDC-token van de workflow in voor een Azure-token.
+- **Rechten:** alleen **Foundry User** (agent en modellen aanroepen via het project) en **Cognitive Services User** (de `azure-ai-evaluation`-evaluators praten rechtstreeks tegen het `cognitiveservices.azure.com`-endpoint van het account, niet via het project). Geen Contributor: de identiteit kan niets uitrollen, alleen evalueren.
+- **Cross-resource group rol.** De identiteit staat in `rg-cicd`, het Foundry-account in `rg-dev`. `infra/bootstrap/foundry-role.bicep` wijst de rol toe op scope van `rg-dev` vanuit een deployment die zelf in `rg-cicd` draait.
+- **GitHub-environment `eval`:** secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`; variabelen `AZURE_AI_PROJECT_ENDPOINT` en `FOUNDRY_ACCOUNT_NAME` (geen secrets, maar staan niet in de repo). Beperkt tot branch `main`.
+- **Uitkomst:** de resultaten (`evals/results/latest.json`) gaan als artifact mee, en een tabel per categorie (geslaagd/totaal) komt in de jobsamenvatting. `evals/evaluate.py` geeft zelf exit 1 als niet alles slaagt, dus de job faalt mee.
+
+⚠ Valkuil: nieuwe GitHub-repo's zetten numerieke ID's in het OIDC-subject (`repo:<owner>@<ownerId>/<repo>@<repoId>:environment:eval`), niet alleen de naam. Zonder die ID's faalt de login met AADSTS700213. Ophalen met `gh api repos/<owner>/<repo> --jq '.owner.id, .id'`.
+
 ## v2: vertrouwen, bronnen, vervolgvragen, loopbaan-tijdlijn
 
 Draait naast de productie-API, op de v2-omgeving van de site (branch `v2` in de website-repo, eigen Container App `api-v2`, zie `azure.yaml`).

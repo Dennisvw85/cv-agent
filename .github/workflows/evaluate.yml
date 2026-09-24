@@ -1,0 +1,86 @@
+name: evaluate
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Welke agent evalueren'
+        type: choice
+        required: true
+        default: cv-agent-v2
+        options:
+          - cv-agent
+          - cv-agent-v2
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    environment: eval
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AGENT_NAME: ${{ inputs.agent }}
+      AZURE_AI_PROJECT_ENDPOINT: ${{ vars.AZURE_AI_PROJECT_ENDPOINT }}
+      FOUNDRY_ACCOUNT_NAME: ${{ vars.FOUNDRY_ACCOUNT_NAME }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Inloggen op Azure met OIDC, zonder secret
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: false
+
+      - name: Evaluatie draaien (21 vragen)
+        run: uv run evals/evaluate.py
+
+      - name: Resultaten uploaden
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-results-${{ inputs.agent }}
+          path: evals/results/latest.json
+          if-no-files-found: warn
+
+      - name: Samenvatting schrijven
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          path = pathlib.Path("evals/results/latest.json")
+          if not path.exists():
+              print("Geen resultatenbestand gevonden (evaluatie is waarschijnlijk vroeg gestopt).")
+              raise SystemExit(0)
+          results = json.loads(path.read_text())
+          agent = "${{ inputs.agent }}"
+          print(f"# Evaluatie {agent}\n")
+          by_cat = {}
+          for r in results:
+              cat = r.get("category", "onbekend")
+              by_cat.setdefault(cat, [0, 0])
+              by_cat[cat][1] += 1
+              if r.get("passed"):
+                  by_cat[cat][0] += 1
+          total_pass = sum(r.get("passed", False) for r in results)
+          print(f"**Totaal: {total_pass}/{len(results)} geslaagd**\n")
+          print("| Categorie | Geslaagd |")
+          print("|---|---|")
+          for cat, (passed, count) in sorted(by_cat.items()):
+              print(f"| {cat} | {passed}/{count} |")
+          failed = [r for r in results if not r.get("passed")]
+          if failed:
+              print("\n## Gefaalde vragen\n")
+              for r in failed:
+                  print(f"- `{r['id']}` ({r.get('category')}): {r.get('reason', '')}")
+          PY
+          # evals/evaluate.py zelf geeft al exit 1 als niet alles slaagt (stap hierboven, "Evaluatie
+          # draaien"); die stap heeft de job dan al op failed gezet. Deze samenvattingsstap draait
+          # met if: always() zodat de samenvatting er ook staat als de evaluatie faalt.
