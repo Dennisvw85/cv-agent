@@ -51,6 +51,14 @@ def download_sources() -> list[pathlib.Path]:
     return files
 
 
+def local_sources() -> list[pathlib.Path]:
+    """Eigen teksten in knowledge/extra/, bijvoorbeeld de opgeschoonde LinkedIn-export."""
+    files = sorted((ROOT / "knowledge" / "extra").glob("*.md"))
+    for path in files:
+        print(f"  bron: {path.name}")
+    return files
+
+
 def rebuild_vector_store(files: list[pathlib.Path]) -> str:
     """Nieuwe vector store met de bronnen; oude met dezelfde naam gaan weg."""
     old = [vs.id for vs in openai.vector_stores.list() if vs.name == VECTOR_STORE_NAME]
@@ -66,7 +74,7 @@ def rebuild_vector_store(files: list[pathlib.Path]) -> str:
 
 def main() -> None:
     print(f"Kennisbank opbouwen voor {AGENT_NAME}")
-    store_id = rebuild_vector_store(download_sources())
+    store_id = rebuild_vector_store(download_sources() + local_sources())
 
     cv = (ROOT / "knowledge" / "cv.md").read_text()
     instructions = (ROOT / "agent" / "instructions.md").read_text().replace("{cv}", cv)
