@@ -7,6 +7,7 @@
     "foundryResourceGroup": { "value": "${FOUNDRY_RESOURCE_GROUP}" },
     "foundryAccountName": { "value": "${FOUNDRY_ACCOUNT_NAME}" },
     "foundryProjectName": { "value": "${FOUNDRY_PROJECT_NAME}" },
-    "appInsightsName": { "value": "${APPLICATIONINSIGHTS_NAME}" }
+    "appInsightsName": { "value": "${APPLICATIONINSIGHTS_NAME}" },
+    "apiImage": { "value": "${SERVICE_API_IMAGE_NAME}" }
   }
 }

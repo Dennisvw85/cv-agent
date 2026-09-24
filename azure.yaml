@@ -6,7 +6,10 @@ services:
   api:
     project: ./api
     language: py
-    host: function
+    host: containerapp
+    docker:
+      path: Dockerfile
+      remoteBuild: true
 hooks:
   postprovision:
     shell: sh

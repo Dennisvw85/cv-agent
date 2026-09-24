@@ -26,6 +26,9 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   tags: tags
 }
 
+@description('Door azd ingevuld na de eerste deploy')
+param apiImage string = ''
+
 // Alleen lezen (existing): azd ziet dit niet als eigen resource.
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   scope: resourceGroup(foundryResourceGroup)
@@ -34,25 +37,28 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
 
 var projectEndpoint = 'https://${foundryAccountName}.services.ai.azure.com/api/projects/${foundryProjectName}'
 
-module api 'modules/function.bicep' = {
+module api 'modules/api.bicep' = {
   scope: rg
   params: {
     name: resourceToken
     location: location
     tags: tags
-    appSettings: {
-      AZURE_AI_PROJECT_ENDPOINT: projectEndpoint
-      AGENT_NAME: agentName
-      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
-    }
+    image: apiImage
+    logAnalyticsWorkspaceId: appInsights.properties.WorkspaceResourceId
+    appInsightsConnectionString: appInsights.properties.ConnectionString
+    env: [
+      { name: 'AZURE_AI_PROJECT_ENDPOINT', value: projectEndpoint }
+      { name: 'AGENT_NAME', value: agentName }
+    ]
   }
 }
 
 output AZURE_RESOURCE_GROUP string = rg.name
-output AZURE_FUNCTION_APP_NAME string = api.outputs.name
-output AZURE_FUNCTION_APP_ID string = api.outputs.id
-output AZURE_FUNCTION_LOCATION string = location
-output AZURE_FUNCTION_PRINCIPAL_ID string = api.outputs.principalId
+output AZURE_API_NAME string = api.outputs.name
+output AZURE_API_ID string = api.outputs.id
+output AZURE_API_LOCATION string = location
+output AZURE_API_PRINCIPAL_ID string = api.outputs.principalId
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = api.outputs.registryEndpoint
 output AZURE_AI_PROJECT_ENDPOINT string = projectEndpoint
 output AZURE_AI_MODEL_DEPLOYMENT_NAME string = modelDeploymentName
 output AGENT_NAME string = agentName

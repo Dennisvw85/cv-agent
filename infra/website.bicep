@@ -1,10 +1,10 @@
-// De bestaande CV-site: naar Standard, met wachtwoord, en de Function App als /api-backend.
+// De bestaande CV-site: naar Standard, met wachtwoord, en de Container App als /api-backend.
 // Wordt uitgerold naar de resource group van de site, apart van azd (zie README: waarom).
 param staticSiteName string
 param location string = resourceGroup().location
 param repositoryUrl string
-param functionAppId string
-param functionAppLocation string
+param apiResourceId string
+param apiLocation string
 
 @secure()
 @description('Wachtwoord voor bezoekers: min. 8 tekens met hoofdletter, kleine letter, cijfer en symbool')
@@ -40,8 +40,8 @@ resource backend 'Microsoft.Web/staticSites/linkedBackends@2024-04-01' = {
   parent: site
   name: 'cv-agent-api'
   properties: {
-    backendResourceId: functionAppId
-    region: functionAppLocation
+    backendResourceId: apiResourceId
+    region: apiLocation
   }
 }
 

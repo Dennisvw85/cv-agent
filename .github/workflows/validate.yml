@@ -22,4 +22,4 @@ jobs:
           done
       - uses: astral-sh/setup-uv@v7
       - name: Python-syntax van API, scripts en evaluatie
-        run: uv run --no-project python -m py_compile api/function_app.py scripts/deploy_agent.py evals/evaluate.py
+        run: uv run --no-project python -m py_compile api/app.py scripts/deploy_agent.py evals/evaluate.py
