@@ -1,0 +1,46 @@
+{
+  "foundry-landing-zone": {
+    "alt_en": "A white geometric design with nested squares and a glowing effect on a black background.",
+    "alt_nl": "Een wit geometrisch ontwerp met geneste vierkanten en een gloeiend effect op een zwarte achtergrond.",
+    "safety": [
+      [
+        "Hate",
+        0
+      ],
+      [
+        "SelfHarm",
+        0
+      ],
+      [
+        "Sexual",
+        0
+      ],
+      [
+        "Violence",
+        0
+      ]
+    ]
+  },
+  "cv-agent": {
+    "alt_en": "A speech bubble with a glowing light at the end, connected by lines and dots, against a dark background.",
+    "alt_nl": "Een tekstballon met een gloeiend licht aan het uiteinde, verbonden door lijnen en stippen, tegen een donkere achtergrond.",
+    "safety": [
+      [
+        "Hate",
+        0
+      ],
+      [
+        "SelfHarm",
+        0
+      ],
+      [
+        "Sexual",
+        0
+      ],
+      [
+        "Violence",
+        0
+      ]
+    ]
+  }
+}

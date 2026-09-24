@@ -40,6 +40,30 @@ resource chatModel 'Microsoft.CognitiveServices/accounts/deployments@2026-07-01'
   }
 }
 
+// Vision (build-time): beelden maken en beschrijven. Na elkaar uitrollen: het account
+// accepteert één wijziging tegelijk (RequestConflict).
+resource imageModel 'Microsoft.CognitiveServices/accounts/deployments@2026-07-01' = {
+  parent: foundry
+  name: 'flux-2-pro'
+  sku: { name: 'GlobalStandard', capacity: 1 }
+  properties: {
+    model: { format: 'Black Forest Labs', name: 'FLUX.2-pro', version: '1' }
+    versionUpgradeOption: 'NoAutoUpgrade'
+  }
+  dependsOn: [chatModel]
+}
+
+resource visionModel 'Microsoft.CognitiveServices/accounts/deployments@2026-07-01' = {
+  parent: foundry
+  name: 'phi-4-multimodal'
+  sku: { name: 'GlobalStandard', capacity: 1 }
+  properties: {
+    model: { format: 'Microsoft', name: 'Phi-4-multimodal-instruct', version: '1' }
+    versionUpgradeOption: 'NoAutoUpgrade'
+  }
+  dependsOn: [imageModel]
+}
+
 resource apiFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: foundry
   name: guid(foundry.id, apiPrincipalId, foundryUserRoleId)

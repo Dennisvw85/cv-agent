@@ -2,7 +2,7 @@
 
 Een AI-agent op Microsoft Foundry die vragen beantwoordt over mijn CV en mijn publieke repo's, via tekst of met je stem. Hij draait live in de chat op mijn CV-site, achter een wachtwoord. Alles staat in code: infrastructuur in Bicep, de agent en kennisbank in Python, de evaluatie als testset.
 
-> Hoort bij domein 2 van AI-103 (*Implement generative AI and agentic solutions*: RAG, evaluaties, tracing) en de spraakbullets van domein 4 (*speech as an agent modality*). Draait als workload op de [foundry-landing-zone](https://github.com/Dennisvw85/foundry-landing-zone).
+> Hoort bij domein 2 van AI-103 (*Implement generative AI and agentic solutions*: RAG, evaluaties, tracing), de spraakbullets van domein 4 (*speech as an agent modality*) en domein 3 (beeld maken, beeld begrijpen, alt-tekst, content safety voor beeld). Draait als workload op de [foundry-landing-zone](https://github.com/Dennisvw85/foundry-landing-zone).
 
 ## Architectuur
 
@@ -28,6 +28,25 @@ managed identity het controlekanaal naar Voice Live en geeft het antwoord terug.
 de audio rechtstreeks tussen browser en Azure; de API sluit het kanaal na 3 minuten.
 ```
 
+## Live avatar
+
+Naast tekst en spraak kan de bezoeker praten met een pratende avatar (Voice Live + text-to-speech-avatar, standaard-avatar "Harry"). Een avatar werkt niet met het WebRTC-controlekanaal van `/api/voice`, dus volgt deze het patroon van Microsofts [voice-live-avatar-sample](https://github.com/microsoft-foundry/voicelive-samples/tree/main/javascript/voice-live-avatar): `POST /api/avatar/token` geeft de browser een token, en de browser praat zelf met Voice Live (microfoon over WebSocket, beeld en geluid via WebRTC).
+
+- **Het token komt van een aparte identiteit** (`id-browser-…`) met alleen Foundry User en Cognitive Services User. Los intrekbaar en los te volgen in de logs.
+- **Het token is 24 uur geldig.** Dat is de vaste levensduur van managed-identity-tokens; korter kan niet. Alleen wachtwoordhouders krijgen het.
+- **Noodrem:** `./scripts/revoke-browser-access.sh` trekt de rollen in. Gemeten: een al uitgegeven token werkt daarna na ongeveer 5 minuten niet meer. Herstellen met `azd hooks run postprovision`.
+
+## Projectbeelden (vision)
+
+`scripts/generate_visuals.py` maakt de beelden voor de sectie Projecten op de site, met vier Foundry-diensten achter elkaar, allemaal keyless:
+
+1. **FLUX.2-pro** maakt een beeld uit een prompt in `visuals/projects.json`.
+2. **Azure AI Content Safety** controleert het beeld; alles boven "veilig" wordt opnieuw gegenereerd.
+3. **Phi-4-multimodal** (een klein multimodaal model) schrijft een Engelse alt-tekst volgens WCAG.
+4. **Azure Translator** vertaalt die naar het Nederlands.
+
+Het script schrijft de beelden naar de website-repo en vult de sectie tussen `<!-- PROJECTS:START -->` en `<!-- PROJECTS:END -->`. Bestaande beelden blijven staan; `--force` maakt ze opnieuw.
+
 ## Wat waar staat
 
 | Pad | Wat |
@@ -42,7 +61,9 @@ de audio rechtstreeks tussen browser en Azure; de API sluit het kanaal na 3 minu
 | `infra/foundry-access.bicep` | In het Foundry-account: modeldeployment `cv-chat` en de rollen voor de API |
 | `infra/website.bicep` | De CV-site: Standard-plan, wachtwoord, en de Container App als `/api`-backend |
 | `scripts/postprovision.sh` | Rolt de twee bestanden hierboven uit en draait `deploy_agent.py` |
-| `evals/` | Twintig testvragen en het evaluatiescript |
+| `evals/` | Testvragen en het evaluatiescript |
+| `scripts/revoke-browser-access.sh` | Noodrem: trekt de rollen van de browser-identiteit (avatar-token) in |
+| `scripts/generate_visuals.py`, `visuals/` | Projectbeelden: FLUX → Content Safety → Phi-4-multimodal → Translator |
 
 ## De keuzes
 
@@ -107,3 +128,5 @@ De evaluators draaien op de algemene deployment van de landing zone, niet op `cv
 9. **Voice Live met een agent vraagt twee rollen:** Foundry User én Cognitive Services User op het account. En het subprotocol `realtime` op het WebSocket-controlekanaal, anders komt er geen enkel bericht terug.
 10. **`Permissions-Policy: microphone=()` blokkeert de microfoon** volledig. Voor spraak moet het `microphone=(self)` zijn.
 11. **Van Function App naar Container App wisselen gaf "expecting only 1 resource tagged azd-service-name: api".** Bicep verwijdert niets wat uit het template verdwijnt (incremental mode); de oude Function had dezelfde tag nog. Oude resources, hun rollen en hun identiteit expliciet opgeruimd.
+12. **Phi-4-multimodal schreef onbruikbare Nederlandse alt-teksten** (met een stuk Punjabi midden in de zin), en haalde bij capaciteit 1 al snel een rate limit. In het Engels was hij prima. Oplossing: Engels laten beschrijven en vertalen met Azure Translator. Klein model voor wat het goed kan, gespecialiseerde dienst voor de rest.
+13. **Een managed-identity-token is 24 uur geldig, niet 1 uur.** Gemeten bij het avatar-token. Dat veranderde de risicoafweging; de noodrem (rollen intrekken, ~5 min) is het antwoord.

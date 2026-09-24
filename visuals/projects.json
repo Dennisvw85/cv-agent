@@ -1,0 +1,18 @@
+[
+  {
+    "slug": "foundry-landing-zone",
+    "title": "Foundry Landing Zone",
+    "description": "Microsoft Foundry volledig als code: Bicep en azd, keyless, RBAC, tracing, budget en CI/CD met OIDC.",
+    "url": "https://github.com/Dennisvw85/foundry-landing-zone",
+    "tags": ["Bicep", "azd", "OIDC", "RBAC"],
+    "prompt": "Minimal abstract illustration on a near-black background: a clean isometric foundation platform made of thin glowing white lines, layered like infrastructure blueprints, subtle blue accent light, calm and precise, no text, no letters, no logos"
+  },
+  {
+    "slug": "cv-agent",
+    "title": "CV-agent",
+    "description": "De agent achter deze site: Foundry prompt agent met File Search, evaluaties, spraak en een live avatar.",
+    "url": "https://github.com/Dennisvw85/cv-agent",
+    "tags": ["Foundry Agent", "RAG", "Voice Live", "Evaluaties"],
+    "prompt": "Minimal abstract illustration on a near-black background: a soft glowing speech bubble made of connected white nodes and fine lines, with a faint sound wave flowing out of it, subtle warm accent light, calm and elegant, no text, no letters, no logos"
+  }
+]
