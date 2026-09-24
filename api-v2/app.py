@@ -215,3 +215,90 @@ async def avatar_token():
         "project_name": PROJECT_NAME,
         "max_seconds": MAX_VOICE_SECONDS,
     }
+
+
+# ---------------------------------------------------------------------------
+# v2: vacature-matcher
+# Content Understanding maakt van een PDF markdown; de agent "cv-matcher" vergelijkt die met het CV
+# en geeft structured output (JSON-schema) terug. Eigen deployment "cv-match" = eigen kostenrem.
+# ---------------------------------------------------------------------------
+import base64
+import httpx
+
+MATCH_AGENT = "cv-matcher"
+MAX_JOB_CHARS = 12_000
+MAX_PDF_BYTES = 4 * 1024 * 1024
+CU_URL = f"https://{FOUNDRY_ACCOUNT}.services.ai.azure.com/contentunderstanding"
+match_slots = asyncio.Semaphore(2)
+
+
+async def pdf_to_markdown(pdf: bytes) -> str:
+    """Content Understanding (GA 2025-11-01), prebuilt-layout: OCR + layout naar markdown."""
+    token = (await asyncio.to_thread(credential.get_token, "https://cognitiveservices.azure.com/.default")).token
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(timeout=30) as client:
+        start = await client.post(
+            f"{CU_URL}/analyzers/prebuilt-layout:analyzeBinary?api-version=2025-11-01",
+            headers={**headers, "Content-Type": "application/pdf"},
+            content=pdf,
+        )
+        start.raise_for_status()
+        location = start.headers["Operation-Location"]
+        for _ in range(20):
+            await asyncio.sleep(1)
+            result = (await client.get(location, headers=headers)).json()
+            if result["status"] == "Succeeded":
+                return result["result"]["contents"][0]["markdown"]
+            if result["status"] not in ("Running", "NotStarted"):
+                raise RuntimeError(f"Content Understanding: {result['status']}")
+    raise TimeoutError("Content Understanding duurde te lang")
+
+
+@app.post("/api/match")
+async def match(request: Request):
+    try:
+        data = await request.json()
+    except ValueError:
+        return error(400, "Verwacht JSON.")
+
+    if match_slots.locked():
+        return error(429, "Er lopen al matches. Probeer het over een minuut opnieuw.")
+    async with match_slots:
+        source = "tekst"
+        try:
+            if data.get("pdf_base64"):
+                pdf = base64.b64decode(str(data["pdf_base64"]), validate=True)
+                if len(pdf) > MAX_PDF_BYTES or not pdf.startswith(b"%PDF"):
+                    return error(400, "Upload een PDF van maximaal 4 MB.")
+                job = await pdf_to_markdown(pdf)
+                source = "pdf"
+            else:
+                job = str(data.get("text", "")).strip()
+        except Exception:  # noqa: BLE001
+            log.exception("PDF verwerken mislukt")
+            return error(502, "De PDF kon niet worden gelezen.")
+
+        if len(job) < 80:
+            return error(400, "Plak een volledige vacaturetekst of upload een PDF.")
+        job = job[:MAX_JOB_CHARS]
+
+        try:
+            response = await asyncio.to_thread(
+                openai_client.responses.create,
+                input=job,
+                extra_body={"agent_reference": {"name": MATCH_AGENT, "type": "agent_reference"}},
+            )
+            result = json.loads(response.output_text)
+        except openai.RateLimitError:
+            return error(429, "Het is even druk, probeer het over een minuut opnieuw.")
+        except openai.BadRequestError as exc:
+            if "content_filter" in str(exc):
+                return error(400, "Deze tekst kan ik niet beoordelen.")
+            log.exception("Matcher: ongeldig verzoek")
+            return error(502, "De matcher is even niet bereikbaar.")
+        except Exception:  # noqa: BLE001
+            log.exception("Matcher mislukt")
+            return error(502, "De matcher is even niet bereikbaar.")
+
+    result["source"] = source
+    return result

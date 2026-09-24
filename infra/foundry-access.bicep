@@ -64,6 +64,18 @@ resource visionModel 'Microsoft.CognitiveServices/accounts/deployments@2026-07-0
   dependsOn: [imageModel]
 }
 
+// Eigen deployment voor de vacature-matcher: eigen kostenrem, zodat hij de chat nooit blokkeert.
+resource matchModel 'Microsoft.CognitiveServices/accounts/deployments@2026-07-01' = {
+  parent: foundry
+  name: 'cv-match'
+  sku: { name: 'GlobalStandard', capacity: 10 }
+  properties: {
+    model: { format: 'OpenAI', name: modelName, version: modelVersion }
+    versionUpgradeOption: 'NoAutoUpgrade'
+  }
+  dependsOn: [visionModel]
+}
+
 resource apiFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: foundry
   name: guid(foundry.id, apiPrincipalId, foundryUserRoleId)
