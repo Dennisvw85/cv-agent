@@ -25,6 +25,13 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
   tags: tags
 }
 
+// Aparte identiteit waarvan de browser (avatar-gesprek) een token krijgt. Los intrekbaar en los te volgen.
+resource browserIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-browser-${name}'
+  location: location
+  tags: tags
+}
+
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: 'cr${name}'
   location: location
@@ -69,7 +76,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
   tags: union(tags, { 'azd-service-name': 'api' })
   identity: {
     type: 'UserAssigned'
-    userAssignedIdentities: { '${identity.id}': {} }
+    userAssignedIdentities: { '${identity.id}': {}, '${browserIdentity.id}': {} }
   }
   properties: {
     environmentId: environment.id
@@ -92,6 +99,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: concat(env, [
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
+            { name: 'BROWSER_TOKEN_CLIENT_ID', value: browserIdentity.properties.clientId }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'appinsights-connection-string' }
           ])
         }
@@ -106,4 +114,5 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 output name string = api.name
 output id string = api.id
 output principalId string = identity.properties.principalId
+output browserPrincipalId string = browserIdentity.properties.principalId
 output registryEndpoint string = registry.properties.loginServer

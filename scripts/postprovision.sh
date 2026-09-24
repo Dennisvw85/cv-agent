@@ -11,6 +11,7 @@ az deployment group create \
   --template-file infra/foundry-access.bicep \
   --parameters foundryAccountName="$FOUNDRY_ACCOUNT_NAME" \
                apiPrincipalId="$AZURE_API_PRINCIPAL_ID" \
+               browserPrincipalId="$AZURE_BROWSER_PRINCIPAL_ID" \
                modelDeploymentName="$AZURE_AI_MODEL_DEPLOYMENT_NAME" \
   --output none
 

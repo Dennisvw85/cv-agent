@@ -5,6 +5,9 @@ param foundryAccountName string
 @description('Principal-ID van de managed identity van de API (Container App)')
 param apiPrincipalId string
 
+@description('Principal-ID van de identiteit waarvan de browser een token krijgt voor het avatar-gesprek')
+param browserPrincipalId string
+
 param modelDeploymentName string = 'cv-chat'
 param modelName string = 'gpt-4.1-mini'
 param modelVersion string = '2025-04-14'
@@ -52,6 +55,27 @@ resource apiCognitiveServicesUser 'Microsoft.Authorization/roleAssignments@2022-
   name: guid(foundry.id, apiPrincipalId, cognitiveServicesUserRoleId)
   properties: {
     principalId: apiPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+  }
+}
+
+// De browser-identiteit krijgt dezelfde twee rollen als Voice Live vraagt, en niets meer.
+resource browserFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: foundry
+  name: guid(foundry.id, browserPrincipalId, foundryUserRoleId)
+  properties: {
+    principalId: browserPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryUserRoleId)
+  }
+}
+
+resource browserCognitiveServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: foundry
+  name: guid(foundry.id, browserPrincipalId, cognitiveServicesUserRoleId)
+  properties: {
+    principalId: browserPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
   }

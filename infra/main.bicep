@@ -58,6 +58,7 @@ output AZURE_API_NAME string = api.outputs.name
 output AZURE_API_ID string = api.outputs.id
 output AZURE_API_LOCATION string = location
 output AZURE_API_PRINCIPAL_ID string = api.outputs.principalId
+output AZURE_BROWSER_PRINCIPAL_ID string = api.outputs.browserPrincipalId
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = api.outputs.registryEndpoint
 output AZURE_AI_PROJECT_ENDPOINT string = projectEndpoint
 output AZURE_AI_MODEL_DEPLOYMENT_NAME string = modelDeploymentName

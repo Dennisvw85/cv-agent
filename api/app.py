@@ -19,7 +19,7 @@ from urllib.parse import urlencode
 import openai
 import websockets
 from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -47,6 +47,7 @@ credential = DefaultAzureCredential()  # managed identity via AZURE_CLIENT_ID
 project = AIProjectClient(endpoint=PROJECT_ENDPOINT, credential=credential)
 openai_client = project.get_openai_client()
 voice_slots = asyncio.Semaphore(MAX_VOICE_SESSIONS)
+AVATAR_TOKEN_CLIENT_ID = os.environ.get("BROWSER_TOKEN_CLIENT_ID")
 active_calls: dict[str, object] = {}  # sessie-ID -> open controlekanaal
 
 app = FastAPI()
@@ -190,3 +191,27 @@ async def voice_stop(request: Request):
     if ws is not None:
         await ws.close()
     return {"stopped": ws is not None}
+
+
+@app.post("/api/avatar/token")
+async def avatar_token():
+    """Token voor het live avatar-gesprek, volgens het patroon van Microsofts voice-live-avatar-sample.
+
+    Een avatar werkt niet met het WebRTC-controlekanaal van /api/voice, dus hier praat de browser
+    zelf met Voice Live. Het token komt van een aparte identiteit met alleen de twee rollen die
+    Voice Live nodig heeft. Alleen bereikbaar via de site, dus alleen voor wie het wachtwoord heeft.
+    """
+    if not AVATAR_TOKEN_CLIENT_ID:
+        return error(503, "Avatar is niet geconfigureerd.")
+    token = await asyncio.to_thread(
+        ManagedIdentityCredential(client_id=AVATAR_TOKEN_CLIENT_ID).get_token, "https://ai.azure.com/.default"
+    )
+    log.info("Avatar-token uitgegeven, geldig tot %s", time.strftime("%H:%M", time.gmtime(token.expires_on)))
+    return {
+        "token": token.token,
+        "expires_on": token.expires_on,
+        "endpoint": f"https://{FOUNDRY_ACCOUNT}.services.ai.azure.com/",
+        "agent_name": AGENT_NAME,
+        "project_name": PROJECT_NAME,
+        "max_seconds": MAX_VOICE_SECONDS,
+    }
