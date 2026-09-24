@@ -43,6 +43,22 @@ BLOCKED_ANSWER = (
     "with questions about Dennis' experience, certifications and projects."
 )
 
+# Bestandsnamen in de vector store (zie cv-agent/scripts/deploy_agent.py) naar leesbare labels.
+SOURCE_LABELS = {
+    "foundry-landing-zone.md": "Foundry-landing-zone (repo)",
+    "cv-agent.md": "CV-agent (repo)",
+    "linkedin.md": "LinkedIn-profiel",
+}
+
+FOLLOWUP_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["questions"],
+    "properties": {
+        "questions": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2},
+    },
+}
+
 credential = DefaultAzureCredential()  # managed identity via AZURE_CLIENT_ID
 project = AIProjectClient(endpoint=PROJECT_ENDPOINT, credential=credential)
 openai_client = project.get_openai_client()
@@ -55,6 +71,51 @@ app = FastAPI()
 
 def error(status: int, text: str) -> JSONResponse:
     return JSONResponse({"error": text}, status_code=status)
+
+
+def extract_sources(response) -> list[str]:
+    """Leesbare labels voor de File Search-bronnen die de agent in dit antwoord citeerde."""
+    names: list[str] = []
+    for item in getattr(response, "output", None) or []:
+        if getattr(item, "type", None) != "message":
+            continue
+        for content in getattr(item, "content", None) or []:
+            for ann in getattr(content, "annotations", None) or []:
+                if getattr(ann, "type", None) == "file_citation":
+                    filename = getattr(ann, "filename", None)
+                    if filename:
+                        names.append(SOURCE_LABELS.get(filename, filename))
+    # volgorde behouden, dubbelen eruit
+    return list(dict.fromkeys(names))
+
+
+async def suggest_followups(question: str, answer: str) -> list[str]:
+    """Twee korte vervolgvragen, met een lichte, losse aanroep op dezelfde (kostenremmende) deployment.
+
+    Optioneel: bij een fout of 429 komt er gewoon geen vervolgvraag, de chat blijft werken.
+    """
+    try:
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                openai_client.responses.create,
+                model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+                temperature=0.5,
+                max_output_tokens=120,
+                input=(
+                    "Op basis van dit gesprek over het CV van Dennis van Waas, geef precies twee korte, "
+                    "natuurlijke vervolgvragen die een bezoeker zou kunnen stellen. Zelfde taal als de vraag. "
+                    "Antwoord alleen met JSON.\n\n"
+                    f"Vraag: {question}\nAntwoord: {answer[:800]}"
+                ),
+                text={"format": {"type": "json_schema", "name": "followups", "schema": FOLLOWUP_SCHEMA, "strict": True}},
+            ),
+            timeout=8,
+        )
+        data = json.loads(response.output_text)
+        return [str(q).strip() for q in data.get("questions", []) if str(q).strip()][:2]
+    except Exception:  # noqa: BLE001 - vervolgvragen zijn een extraatje, nooit blokkerend
+        log.info("Geen vervolgvragen gegenereerd (overgeslagen)")
+        return []
 
 
 @app.get("/api/health")
@@ -99,7 +160,9 @@ async def chat(request: Request):
         log.exception("Agent-aanroep mislukt")
         return error(502, "De assistent is even niet bereikbaar.")
 
-    return {"answer": response.output_text, "response_id": response.id}
+    sources = extract_sources(response)
+    followups = await suggest_followups(message, response.output_text)
+    return {"answer": response.output_text, "response_id": response.id, "sources": sources, "followups": followups}
 
 
 async def hold_control_channel(ws, session_id: str) -> None:

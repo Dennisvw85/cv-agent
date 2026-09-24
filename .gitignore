@@ -10,3 +10,4 @@ api/.python_packages/
 local.settings.json
 .DS_Store
 evals/results/
+.scan_*/
