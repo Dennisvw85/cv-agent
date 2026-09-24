@@ -42,5 +42,27 @@
         0
       ]
     ]
+  },
+  "glass-cockpit": {
+    "alt_en": "A tablet displays three circular gauges with various numbers and lines.",
+    "alt_nl": "Een tablet toont drie ronde meters met verschillende nummers en lijnen.",
+    "safety": [
+      [
+        "Hate",
+        0
+      ],
+      [
+        "SelfHarm",
+        0
+      ],
+      [
+        "Sexual",
+        0
+      ],
+      [
+        "Violence",
+        0
+      ]
+    ]
   }
 }
