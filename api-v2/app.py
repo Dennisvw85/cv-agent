@@ -123,6 +123,60 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+# ---------------------------------------------------------------------------
+# Live-statistieken (sectie Vertrouwen): aantal requests per endpoint, laatste 7 dagen.
+# Bron: ContainerAppHTTPLogs van de landing zone-workspace (gevuld; AppRequests bijna leeg
+# omdat alleen /api/chat auto-instrumented is). Gecached 10 minuten, zodat elke paginabezoek
+# niet opnieuw tegen de workspace query.
+# ---------------------------------------------------------------------------
+LOG_ANALYTICS_WORKSPACE_ID = os.environ.get("LOG_ANALYTICS_WORKSPACE_ID", "")
+STATS_CACHE_SECONDS = 600
+_stats_cache: dict = {"data": None, "expires": 0.0}
+
+STATS_QUERY = """
+ContainerAppHTTPLogs
+| where TimeGenerated > ago(7d)
+| where Path in ("/api/chat", "/api/match", "/api/voice")
+| summarize requests = count() by Path
+"""
+
+
+@app.get("/api/stats")
+async def stats():
+    now = time.monotonic()
+    if _stats_cache["data"] is not None and now < _stats_cache["expires"]:
+        return _stats_cache["data"]
+
+    if not LOG_ANALYTICS_WORKSPACE_ID:
+        return error(503, "Statistieken zijn niet geconfigureerd.")
+
+    try:
+        token = (await asyncio.to_thread(credential.get_token, "https://management.azure.com/.default")).token
+        url = f"https://management.azure.com{LOG_ANALYTICS_WORKSPACE_ID}/api/query?api-version=2017-01-01-preview"
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={"query": STATS_QUERY},
+            )
+            r.raise_for_status()
+            table = r.json()["Tables"][0]
+        counts = {"chat": 0, "match": 0, "voice": 0}
+        path_to_key = {"/api/chat": "chat", "/api/match": "match", "/api/voice": "voice"}
+        for row in table["Rows"]:
+            path, count = row[0], row[1]
+            if path in path_to_key:
+                counts[path_to_key[path]] = int(count)
+        data = {"period_days": 7, "requests": counts, "total": sum(counts.values())}
+    except Exception:  # noqa: BLE001
+        log.exception("Statistieken ophalen mislukt")
+        return error(502, "Statistieken zijn even niet beschikbaar.")
+
+    _stats_cache["data"] = data
+    _stats_cache["expires"] = now + STATS_CACHE_SECONDS
+    return data
+
+
 @app.post("/api/chat")
 async def chat(request: Request):
     try:

@@ -3,7 +3,14 @@
 # azd down gooit elke resource group weg waarin zijn deployment iets heeft uitgerold.
 set -eu
 
-echo "1/3 Foundry: modeldeployment ${AZURE_AI_MODEL_DEPLOYMENT_NAME} en rechten voor de API"
+echo "1/3 Foundry: modeldeployment ${AZURE_AI_MODEL_DEPLOYMENT_NAME}, rechten voor de API en /api/stats"
+# Workspace-naam achter de App Insights-resource, voor de Log Analytics Reader-rol (GET /api/stats).
+LOG_ANALYTICS_WORKSPACE_NAME=$(az resource show \
+  --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --resource-group "$FOUNDRY_RESOURCE_GROUP" \
+  --resource-type Microsoft.Insights/components \
+  --name "$APPLICATIONINSIGHTS_NAME" \
+  --query "properties.WorkspaceResourceId" -o tsv 2>/dev/null | awk -F/ '{print $NF}' || true)
 az deployment group create \
   --subscription "$AZURE_SUBSCRIPTION_ID" \
   --resource-group "$FOUNDRY_RESOURCE_GROUP" \
@@ -13,6 +20,7 @@ az deployment group create \
                apiPrincipalId="$AZURE_API_PRINCIPAL_ID" \
                browserPrincipalId="$AZURE_BROWSER_PRINCIPAL_ID" \
                modelDeploymentName="$AZURE_AI_MODEL_DEPLOYMENT_NAME" \
+               logAnalyticsWorkspaceName="${LOG_ANALYTICS_WORKSPACE_NAME:-}" \
   --output none
 
 echo "2/3 Kennisbank en agent"

@@ -15,12 +15,20 @@ param modelVersion string = '2025-04-14'
 @description('Duizenden tokens per minuut. Dit is de harde rem op kosten en misbruik.')
 param capacity int = 10
 
+@description('Naam van de Log Analytics-workspace van de landing zone (voor GET /api/stats)')
+param logAnalyticsWorkspaceName string = ''
+
 var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 // Voice Live vraagt daarnaast Cognitive Services User op het account.
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+var logAnalyticsReaderRoleId = '73c42c96-874c-492b-b04d-ab87d138a893'
 
 resource foundry 'Microsoft.CognitiveServices/accounts@2026-07-01' existing = {
   name: foundryAccountName
+}
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = if (!empty(logAnalyticsWorkspaceName)) {
+  name: logAnalyticsWorkspaceName
 }
 
 resource chatModel 'Microsoft.CognitiveServices/accounts/deployments@2026-07-01' = {
@@ -114,5 +122,16 @@ resource browserCognitiveServicesUser 'Microsoft.Authorization/roleAssignments@2
     principalId: browserPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+  }
+}
+
+// Voor GET /api/stats: de API leest met deze rol requests van de laatste 7 dagen uit de workspace.
+resource apiLogAnalyticsReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(logAnalyticsWorkspaceName)) {
+  scope: logAnalytics
+  name: guid(logAnalytics.id, apiPrincipalId, logAnalyticsReaderRoleId)
+  properties: {
+    principalId: apiPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', logAnalyticsReaderRoleId)
   }
 }

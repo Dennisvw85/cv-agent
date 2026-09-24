@@ -54,6 +54,7 @@ module api 'modules/api.bicep' = {
       { name: 'AZURE_AI_PROJECT_ENDPOINT', value: projectEndpoint }
       { name: 'AGENT_NAME', value: agentName }
       { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: modelDeploymentName }
+      { name: 'LOG_ANALYTICS_WORKSPACE_ID', value: appInsights.properties.WorkspaceResourceId }
     ]
   }
 }
