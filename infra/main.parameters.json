@@ -8,6 +8,7 @@
     "foundryAccountName": { "value": "${FOUNDRY_ACCOUNT_NAME}" },
     "foundryProjectName": { "value": "${FOUNDRY_PROJECT_NAME}" },
     "appInsightsName": { "value": "${APPLICATIONINSIGHTS_NAME}" },
-    "apiImage": { "value": "${SERVICE_API_IMAGE_NAME}" }
+    "apiImage": { "value": "${SERVICE_API_IMAGE_NAME}" },
+    "apiV2Image": { "value": "${SERVICE_API_V2_IMAGE_NAME}" }
   }
 }

@@ -8,6 +8,9 @@ param tags object
 @description('Leeg bij de eerste uitrol; daarna vult azd het gebouwde image in (SERVICE_API_IMAGE_NAME)')
 param image string = ''
 
+@description('Image van de v2-API (aparte container voor de v2-omgeving van de site)')
+param imageV2 string = ''
+
 @description('Log Analytics-workspace van de landing zone, voor de containerlogs')
 param logAnalyticsWorkspaceId string
 
@@ -111,8 +114,46 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
   dependsOn: [acrPull]
 }
 
+// v2: een tweede API naast productie, gekoppeld aan de v2-omgeving van de site.
+// Zelfde omgeving, registry en identiteit; eigen container, zodat experimenten productie niet raken.
+resource apiV2 'Microsoft.App/containerApps@2024-03-01' = {
+  name: 'ca-apiv2-${name}'
+  location: location
+  tags: union(tags, { 'azd-service-name': 'api-v2' })
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: { '${identity.id}': {}, '${browserIdentity.id}': {} }
+  }
+  properties: {
+    environmentId: environment.id
+    workloadProfileName: 'Consumption'
+    configuration: {
+      ingress: { external: true, targetPort: 8000, transport: 'auto', allowInsecure: false }
+      registries: [{ server: registry.properties.loginServer, identity: identity.id }]
+      secrets: [{ name: 'appinsights-connection-string', value: appInsightsConnectionString }]
+    }
+    template: {
+      containers: [
+        {
+          name: 'api'
+          image: empty(imageV2) ? placeholderImage : imageV2
+          resources: { cpu: json('0.5'), memory: '1Gi' }
+          env: concat(env, [
+            { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
+            { name: 'BROWSER_TOKEN_CLIENT_ID', value: browserIdentity.properties.clientId }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'appinsights-connection-string' }
+          ])
+        }
+      ]
+      scale: { minReplicas: 0, maxReplicas: 1 }
+    }
+  }
+  dependsOn: [acrPull]
+}
+
 output name string = api.name
 output id string = api.id
 output principalId string = identity.properties.principalId
 output browserPrincipalId string = browserIdentity.properties.principalId
 output registryEndpoint string = registry.properties.loginServer
+output idV2 string = apiV2.id

@@ -6,6 +6,9 @@ param repositoryUrl string
 param apiResourceId string
 param apiLocation string
 
+@description('Container App voor de v2-omgeving; leeg = geen v2-koppeling')
+param apiV2ResourceId string = ''
+
 @secure()
 @description('Wachtwoord voor bezoekers: min. 8 tekens met hoofdletter, kleine letter, cijfer en symbool')
 param sitePassword string
@@ -21,7 +24,8 @@ resource site 'Microsoft.Web/staticSites@2024-04-01' = {
     repositoryUrl: repositoryUrl
     branch: 'main'
     provider: 'GitHub'
-    stagingEnvironmentPolicy: 'Disabled'
+    // Enabled: naast productie (main) kan een aparte v2-omgeving draaien.
+    stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
   }
 }
@@ -41,6 +45,20 @@ resource backend 'Microsoft.Web/staticSites/linkedBackends@2024-04-01' = {
   name: 'cv-agent-api'
   properties: {
     backendResourceId: apiResourceId
+    region: apiLocation
+  }
+}
+
+resource v2Build 'Microsoft.Web/staticSites/builds@2024-04-01' existing = if (!empty(apiV2ResourceId)) {
+  parent: site
+  name: 'v2'
+}
+
+resource v2Backend 'Microsoft.Web/staticSites/builds/linkedBackends@2024-04-01' = if (!empty(apiV2ResourceId)) {
+  parent: v2Build
+  name: 'cv-agent-api-v2'
+  properties: {
+    backendResourceId: apiV2ResourceId
     region: apiLocation
   }
 }

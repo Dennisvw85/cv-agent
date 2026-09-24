@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+websockets
+openai
+azure-ai-projects>=2.7.0
+azure-identity>=1.25.3

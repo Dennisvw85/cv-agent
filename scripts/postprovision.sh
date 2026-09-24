@@ -44,5 +44,6 @@ az deployment group create \
                apiResourceId="$AZURE_API_ID" \
                apiLocation="$AZURE_API_LOCATION" \
                sitePassword="$SITE_PASSWORD" \
+               apiV2ResourceId="${AZURE_API_V2_ID:-}" \
   --output none
 echo "Klaar."

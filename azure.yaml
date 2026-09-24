@@ -10,6 +10,13 @@ services:
     docker:
       path: Dockerfile
       remoteBuild: true
+  api-v2:
+    project: ./api-v2
+    language: py
+    host: containerapp
+    docker:
+      path: Dockerfile
+      remoteBuild: true
 hooks:
   postprovision:
     shell: sh

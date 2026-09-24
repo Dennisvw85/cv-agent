@@ -29,6 +29,9 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
 @description('Door azd ingevuld na de eerste deploy')
 param apiImage string = ''
 
+@description('Door azd ingevuld na de eerste deploy van api-v2')
+param apiV2Image string = ''
+
 // Alleen lezen (existing): azd ziet dit niet als eigen resource.
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   scope: resourceGroup(foundryResourceGroup)
@@ -44,6 +47,7 @@ module api 'modules/api.bicep' = {
     location: location
     tags: tags
     image: apiImage
+    imageV2: apiV2Image
     logAnalyticsWorkspaceId: appInsights.properties.WorkspaceResourceId
     appInsightsConnectionString: appInsights.properties.ConnectionString
     env: [
@@ -56,6 +60,7 @@ module api 'modules/api.bicep' = {
 output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_API_NAME string = api.outputs.name
 output AZURE_API_ID string = api.outputs.id
+output AZURE_API_V2_ID string = api.outputs.idV2
 output AZURE_API_LOCATION string = location
 output AZURE_API_PRINCIPAL_ID string = api.outputs.principalId
 output AZURE_BROWSER_PRINCIPAL_ID string = api.outputs.browserPrincipalId
