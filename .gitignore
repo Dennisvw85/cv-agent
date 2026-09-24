@@ -1,0 +1,12 @@
+.azure/
+.env
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+infra/**/*.json
+!infra/main.parameters.json
+api/.python_packages/
+local.settings.json
+.DS_Store
+evals/results/

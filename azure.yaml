@@ -1,0 +1,15 @@
+name: cv-agent
+infra:
+  provider: bicep
+  path: infra
+services:
+  api:
+    project: ./api
+    language: py
+    host: function
+hooks:
+  postprovision:
+    shell: sh
+    run: ./scripts/postprovision.sh
+    interactive: false
+    continueOnError: false

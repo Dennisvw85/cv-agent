@@ -1,0 +1,4 @@
+# Publieke README's die als extra kennis (File Search) in de agent gaan.
+# Eén raw-URL per regel. Alleen eigen, publieke repo's.
+https://raw.githubusercontent.com/Dennisvw85/foundry-landing-zone/main/README.md
+https://raw.githubusercontent.com/Dennisvw85/cv-agent/main/README.md

@@ -1,0 +1,25 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Bicep bouwen en linten
+        run: |
+          az bicep install
+          for f in infra/main.bicep infra/foundry-access.bicep infra/website.bicep; do
+            az bicep build --file "$f" --stdout > /dev/null
+            az bicep lint --file "$f"
+          done
+      - uses: astral-sh/setup-uv@v7
+      - name: Python-syntax van API, scripts en evaluatie
+        run: uv run --no-project python -m py_compile api/function_app.py scripts/deploy_agent.py evals/evaluate.py
