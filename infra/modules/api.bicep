@@ -8,6 +8,9 @@ param tags object
 @description('Leeg bij de eerste uitrol; daarna vult azd het gebouwde image in (SERVICE_API_IMAGE_NAME)')
 param image string = ''
 
+@description('Agent voor de v2-API: zuinigere variant, zie README "v2-agent"')
+param agentNameV2 string = 'cv-agent-v2'
+
 @description('Image van de v2-API (aparte container voor de v2-omgeving van de site)')
 param imageV2 string = ''
 
@@ -138,7 +141,9 @@ resource apiV2 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'api'
           image: empty(imageV2) ? placeholderImage : imageV2
           resources: { cpu: json('0.5'), memory: '1Gi' }
-          env: concat(env, [
+          // Zelfde instellingen als productie, maar met de v2-agent (in code vastgelegd, niet met de hand).
+          env: concat(filter(env, e => e.name != 'AGENT_NAME'), [
+            { name: 'AGENT_NAME', value: agentNameV2 }
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
             { name: 'BROWSER_TOKEN_CLIENT_ID', value: browserIdentity.properties.clientId }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'appinsights-connection-string' }
